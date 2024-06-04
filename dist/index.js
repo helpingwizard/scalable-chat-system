@@ -15,44 +15,107 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http"));
 const ws_1 = require("ws");
+const cors_1 = __importDefault(require("cors"));
 const RedisSubscriptionManager_1 = require("./subscriptions/RedisSubscriptionManager");
+const client_1 = require("@prisma/client");
+const userRouter_1 = __importDefault(require("./routes/userRouter"));
+const roomRouter_1 = __importDefault(require("./routes/roomRouter"));
+const chatRouter_1 = __importDefault(require("./routes/chatRouter"));
 const app = (0, express_1.default)();
-const port = 3000;
+const port = 3001;
+const prisma = new client_1.PrismaClient();
+app.use(express_1.default.json());
+app.use((0, cors_1.default)());
 const server = http_1.default.createServer(app);
 const wss = new ws_1.WebSocketServer({ server });
-const users = {};
-/*
-users = {
-    [user1, user2, user3] : {
-        room : 2,
-        ws
-    },
-    [user4, user1, user7] : {
-        room : 1,
-        ws
-    }
-}
-*/
-let counter = 0;
-wss.on("connection", (ws, req) => __awaiter(void 0, void 0, void 0, function* () {
-    const wsId = counter++;
-    ws.on("message", (message) => {
-        const data = JSON.parse(message.toString());
+app.use('/user', userRouter_1.default);
+app.use('/room', roomRouter_1.default);
+app.use('/chats', chatRouter_1.default);
+wss.on("connection", (ws) => __awaiter(void 0, void 0, void 0, function* () {
+    let userId = 0;
+    let roomId = 0;
+    let username = "";
+    ws.on("message", (message) => __awaiter(void 0, void 0, void 0, function* () {
+        const data = JSON.parse(message);
         if (data.type === "join") {
-            users[wsId] = {
-                room: data.payload.roomId,
-                ws
-            };
-            RedisSubscriptionManager_1.RedisSubscriptionManager.getInstance().subscribe(wsId.toString(), data.payload.roomId, ws);
+            username = data.payload.username;
+            roomId = data.payload.roomId;
+            userId = (yield getUserId(username));
+            if (userId !== null) {
+                const existingUserRoom = yield prisma.userRooms.findUnique({
+                    where: {
+                        userId_roomId: {
+                            userId: userId,
+                            roomId: roomId,
+                        },
+                    },
+                });
+                if (!existingUserRoom) {
+                    yield prisma.userRooms.create({
+                        data: {
+                            userId: userId,
+                            roomId: roomId,
+                        },
+                    });
+                    console.log(`User ${userId} joined room ${roomId}`);
+                }
+                else {
+                    console.log(`User ${userId} is already part of room ${roomId}`);
+                }
+                RedisSubscriptionManager_1.RedisSubscriptionManager.getInstance().subscribe(userId.toString(), roomId.toString(), ws);
+            }
+            else {
+                console.log(`User ${username} not found.`);
+            }
         }
         if (data.type === "message") {
-            const roomId = users[wsId].room;
-            const message = data.payload.message;
-            RedisSubscriptionManager_1.RedisSubscriptionManager.getInstance().addChatMessage(roomId, message);
+            roomId = data.payload.roomId;
+            const content = data.payload.content;
+            const username = data.payload.username;
+            const userId = (yield getUserId(username));
+            console.log(`Attempting to create message for userId: ${userId}, roomId: ${roomId}`);
+            // Check if roomId exists in the Room table
+            const roomExists = yield prisma.room.findUnique({
+                where: { id: roomId },
+            });
+            if (roomExists) {
+                const newMessage = yield prisma.message.create({
+                    data: {
+                        userId: userId,
+                        roomId: roomId,
+                        content: data.payload.content,
+                        createdAt: new Date(),
+                    },
+                });
+                RedisSubscriptionManager_1.RedisSubscriptionManager.getInstance().addChatMessage(roomId.toString(), JSON.stringify({
+                    type: "message",
+                    payload: {
+                        userId: userId,
+                        content: newMessage.content,
+                        createdAt: newMessage.createdAt,
+                    },
+                }));
+            }
+            else {
+                console.log(`Room ${roomId} does not exist.`);
+            }
         }
-    });
-    ws.on("disconnect", () => {
-        RedisSubscriptionManager_1.RedisSubscriptionManager.getInstance().unsubscribe(wsId.toString(), users[wsId].room);
-    });
+    }));
 }));
-server.listen(port);
+function getUserId(username) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const user = yield prisma.user.findUnique({
+            where: { username },
+            select: {
+                id: true
+            }
+        });
+        return user ? user.id : null;
+    });
+}
+app.listen(3000, () => {
+    console.log(`Express server is listening on port ${port}`);
+});
+server.listen(3001, () => {
+    console.log(`Server is listening on port ${port}`);
+});
