@@ -7,4 +7,5 @@ const express_1 = __importDefault(require("express"));
 const room_1 = require("../controllers/room");
 const roomRouter = express_1.default.Router();
 roomRouter.post("/createroom", room_1.createRoom);
+roomRouter.get("/getrooms", room_1.getRooms);
 exports.default = roomRouter;

@@ -16,6 +16,16 @@ export const createRoom = async (req: Request, res: Response) => {
     }
 };
 
+export const getRooms = async(req: Request, res: Response) => {
+    try {
+        const rooms = await prisma.room.findMany();
+        res.json(rooms);
+      } catch (error) {
+        console.error('Error fetching rooms:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+}
+
 // export const joinRoom = async (req: Request, res: Response) => {
 //     const roomId: number = parseInt(req.params.roomId);
 //     const { username } = req.body;

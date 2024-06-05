@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createRoom = void 0;
+exports.getRooms = exports.createRoom = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 const createRoom = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -27,6 +27,17 @@ const createRoom = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.createRoom = createRoom;
+const getRooms = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const rooms = yield prisma.room.findMany();
+        res.json(rooms);
+    }
+    catch (error) {
+        console.error('Error fetching rooms:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+exports.getRooms = getRooms;
 // export const joinRoom = async (req: Request, res: Response) => {
 //     const roomId: number = parseInt(req.params.roomId);
 //     const { username } = req.body;
