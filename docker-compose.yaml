@@ -5,8 +5,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL = env("DATABASE_URL")
-      - REDIS_URL = env("REDIS_URL")
+      - DATABASE_URL=env("DATABASE_URL")
+      - REDIS_URL=env("REDIS_URL")
   redis:
     image: redis
     ports:
