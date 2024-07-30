@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple WS Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #inputbox {
+            width: 300px;
+            padding: 10px;
+        }
+        #sendButton {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        #serverMessages {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            height: 200px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+    </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const webSocket = new WebSocket("ws://localhost:3000");
+
+            webSocket.onopen = () => {
+                console.log("WebSocket connection opened");
+                const urlParams = new URLSearchParams(window.location.search);
+                const roomId = urlParams.get('roomId');
+                if (roomId) {
+                    webSocket.send(JSON.stringify({
+                        type: 'join',
+                        payload: {
+                            roomId: roomId
+                        }
+                    }));
+                }
+            };
+
+            webSocket.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                if (data.type === "message") {
+                    const messageElement = document.createElement("div");
+                    messageElement.textContent = data.payload.message;
+                    document.getElementById("serverMessages").appendChild(messageElement);
+                }
+            };
+
+            webSocket.onerror = function (error) {
+                console.error("WebSocket error:", error);
+            };
+
+            webSocket.onclose = function () {
+                console.log("WebSocket connection closed");
+            };
+
+            document.getElementById("sendButton").addEventListener("click", () => {
+                const message = document.getElementById("inputbox").value;
+                if (message.trim() !== "") {
+                    webSocket.send(JSON.stringify({
+                        type: "message",
+                        payload: {
+                            message: message
+                        }
+                    }));
+                    document.getElementById("inputbox").value = ""; // Clear input after sending
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <input type="text" id="inputbox" placeholder="Type your message here" />
+    <button id="sendButton">Send</button>
+    <h2>Events from server</h2>
+    <div id="serverMessages"></div>
+</body>
+</html>
